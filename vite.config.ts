@@ -31,4 +31,5 @@ function stemServer(): Plugin {
   };
 }
 
-export default defineConfig({ plugins: [stemServer()] });
+// relative base so the build works from any folder, including GitHub Pages
+export default defineConfig({ base: './', plugins: [stemServer()] });

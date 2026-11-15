@@ -231,7 +231,7 @@ function buildStems() {
   if (!S.stems) {
     note.textContent =
       ai === 'off'
-        ? 'Pull the song apart into drums, bass, vocals and everything else. The AI splitter is not running, so only the quick split is available. Start the app with start.bat to get it.'
+        ? 'Pull the song apart into drums, bass, vocals and everything else. The AI splitter is not running, so only the quick split is available. To switch it on, run ai_stems.bat (Windows) or ai_stems.command (Mac) from the Flipside folder.'
         : `Pull the song apart into drums, bass, vocals and everything else. AI gives clean stems and takes about ${mins} minute${mins > 1 ? 's' : ''} for this song. Quick is rougher and takes seconds.`;
     return;
   }
@@ -607,4 +607,23 @@ requestAnimationFrame(frame);
 refresh();
 buildCrate();
 void checkAi();
+// the AI splitter may be started after the app is already open
+window.addEventListener('focus', () => void checkAi());
+
+/* ---------- install as an app, work offline ---------- */
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  void navigator.serviceWorker.register('sw.js').catch(() => undefined);
+}
+let installEvent: (Event & { prompt(): Promise<unknown> }) | null = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installEvent = e as typeof installEvent;
+  $('btnInstall').hidden = false;
+});
+$('btnInstall').onclick = async () => {
+  await installEvent?.prompt();
+  installEvent = null;
+  $('btnInstall').hidden = true;
+};
+window.addEventListener('appinstalled', () => ($('btnInstall').hidden = true));
 void emit;

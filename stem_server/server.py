@@ -22,7 +22,8 @@ import torch  # noqa: E402
 
 PORT = 8765
 MODEL_NAME = "htdemucs"
-ORIGIN_OK = re.compile(r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$")
+# Pages allowed to use this server: the app running locally, and its hosted copy.
+ORIGIN_OK = re.compile(r"^(https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?|https://contact219\.github\.io)$")
 
 state = {"model": None, "error": "", "progress": 0.0}
 work_lock = threading.Lock()
@@ -100,6 +101,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Vary", "Origin")
             self.send_header("Access-Control-Allow-Headers", "Content-Type")
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            # lets a hosted (https) page talk to this computer-local server
+            self.send_header("Access-Control-Allow-Private-Network", "true")
 
     def _send(self, code: int, body: bytes, ctype: str):
         self.send_response(code)

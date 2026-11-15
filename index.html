@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Flipside sample workshop</title>
+    <meta name="description" content="Turn songs into samples: stems, pitch, loops, chops, beat match and ZIP export." />
+    <meta name="theme-color" content="#11302c" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="icon-192.png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -17,6 +22,7 @@
       <h1 class="mark">Flipside</h1>
       <p class="tag">Sample workshop</p>
       <p id="status" class="status" role="status" aria-live="polite"></p>
+      <button id="btnInstall" class="btn" hidden>Install app</button>
       <button id="btnOpen" class="btn">Open a song</button>
       <input id="fileInput" type="file" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a,.aiff,.aif" hidden />
       <input id="drumInput" type="file" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a,.aiff,.aif" hidden />

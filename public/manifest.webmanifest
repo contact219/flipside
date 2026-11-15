@@ -1,0 +1,15 @@
+{
+  "name": "Flipside sample workshop",
+  "short_name": "Flipside",
+  "description": "Turn songs into samples: stems, pitch, loops, chops, beat match and ZIP export.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#d5d7cf",
+  "theme_color": "#11302c",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
