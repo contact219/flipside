@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flipside sample workshop</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header class="top">
+      <h1 class="mark">Flipside</h1>
+      <p class="tag">Sample workshop</p>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <button id="btnOpen" class="btn">Open a song</button>
+      <input id="fileInput" type="file" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a,.aiff,.aif" hidden />
+      <input id="drumInput" type="file" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a,.aiff,.aif" hidden />
+    </header>
+
+    <main id="empty" class="empty">
+      <div id="drop" class="drop">
+        <h2>Drop a song here</h2>
+        <p>WAV, MP3, FLAC, OGG or M4A. Everything is processed on this computer; nothing is uploaded.</p>
+        <div class="row center">
+          <button id="btnPick" class="btn hot">Choose a file</button>
+          <button id="btnDemo" class="btn">Try the built-in demo groove</button>
+        </div>
+      </div>
+    </main>
+
+    <main id="bench" class="bench" hidden>
+      <section class="lcd" aria-label="Song and sample">
+        <div class="lcd-head">
+          <span id="infoName" class="lcd-name"></span>
+          <span id="infoDur"></span>
+          <span id="infoBpm"></span>
+          <span id="infoKey"></span>
+          <span class="grow"></span>
+          <button id="btnZoomSel" class="lcd-btn">Zoom to selection</button>
+          <button id="btnZoomAll" class="lcd-btn">Show whole song</button>
+        </div>
+        <canvas id="srcWave" class="wave src" aria-label="Song waveform. Drag to select the part to sample."></canvas>
+        <div class="lcd-head">
+          <span id="regionRead"></span>
+          <span class="grow"></span>
+          <span class="hint">Drag to select. Drag an edge to resize. Shift-drag starts a new selection. Scroll to zoom.</span>
+        </div>
+        <canvas id="smpWave" class="wave smp" aria-label="Your sample. Click a slice to hear it."></canvas>
+        <div class="lcd-head">
+          <span id="sampleRead"></span>
+        </div>
+      </section>
+
+      <section class="transport">
+        <button id="btnPlay" class="btn hot big">Play</button>
+        <div class="seg" role="group" aria-label="What to play">
+          <button id="modeSample" aria-pressed="true">Sample</button>
+          <button id="modeFlip" aria-pressed="false">Flip</button>
+        </div>
+        <label class="check"><input type="checkbox" data-key="loop" /> Loop</label>
+        <span class="grow"></span>
+        <button id="btnSurprise" class="btn dice" title="Pick a section, stems, pitch, chops and filters at random">
+          Surprise me
+        </button>
+      </section>
+
+      <div class="modules">
+        <section class="mod">
+          <h3>Stems</h3>
+          <p class="note" id="stemNote">Pull the song apart into drums, bass, vocals and everything else, then sample only the parts you want.</p>
+          <div class="row">
+            <button id="btnSplitAi" class="btn hot">Split with AI</button>
+            <button id="btnSplit" class="btn">Quick split</button>
+          </div>
+          <progress id="splitProg" max="1" value="0" hidden></progress>
+          <div id="stemRows" class="stems" hidden></div>
+        </section>
+
+        <section class="mod">
+          <h3>Pitch and speed</h3>
+          <label class="fader"><span>Pitch</span><input type="range" data-key="semis" min="-24" max="24" step="1" /><output></output></label>
+          <label class="fader"><span>Fine tune</span><input type="range" data-key="cents" min="-50" max="50" step="1" /><output></output></label>
+          <label class="fader"><span>Speed</span><input type="range" data-key="tempo" data-scale="0.01" min="50" max="200" step="0.1" /><output></output></label>
+          <label class="check"><input type="checkbox" data-key="linked" /> Pitch follows speed, like a turntable</label>
+          <label class="check"><input type="checkbox" data-key="reverse" /> Reverse</label>
+          <button id="btnPitchReset" class="btn small">Reset pitch and speed</button>
+        </section>
+
+        <section class="mod">
+          <h3>Beat match</h3>
+          <div class="pair">
+            <label class="num"><span>Song tempo</span><input id="songBpm" type="number" min="30" max="300" step="0.1" /></label>
+            <button id="bpmHalf" class="btn small" title="Halve the song tempo">÷2</button>
+            <button id="bpmDouble" class="btn small" title="Double the song tempo">×2</button>
+          </div>
+          <div class="pair">
+            <label class="num"><span>Your drums</span><input id="targetBpm" type="number" data-key="targetBpm" min="30" max="300" step="0.1" /></label>
+            <button id="btnTap" class="btn small">Tap</button>
+            <button id="btnDrum" class="btn small">Load drum loop</button>
+          </div>
+          <p class="note" id="drumName">Type your drum tempo, tap it, or load the drum loop itself.</p>
+          <div class="row">
+            <button id="btnMatch" class="btn">Match sample to drums</button>
+          </div>
+          <div class="pair">
+            <button id="btnFit" class="btn">Fit selection to</button>
+            <select data-key="bars" aria-label="Bars">
+              <option value="1">1 bar</option>
+              <option value="2">2 bars</option>
+              <option value="4">4 bars</option>
+              <option value="8">8 bars</option>
+            </select>
+          </div>
+          <label class="num wide"><span>Play along with</span>
+            <select id="refMode">
+              <option value="off">Nothing</option>
+              <option value="click">Metronome at drum tempo</option>
+              <option value="drums">Loaded drum loop</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="mod">
+          <h3>Loop finder</h3>
+          <p class="note">Finds a section that starts on a beat and comes back around cleanly. Uses the bar count from Beat match.</p>
+          <div class="row">
+            <button id="btnFindLoop" class="btn">Find a loop near here</button>
+            <button id="btnOtherLoop" class="btn">Try another spot</button>
+          </div>
+          <div class="row">
+            <button id="btnPrev" class="btn small" title="Move selection one beat earlier">◀ Beat</button>
+            <button id="btnNext" class="btn small" title="Move selection one beat later">Beat ▶</button>
+            <button id="btnHalf" class="btn small" title="Halve the selection">Half</button>
+            <button id="btnDouble" class="btn small" title="Double the selection">Double</button>
+          </div>
+          <label class="check"><input type="checkbox" data-key="snap" /> Snap selection to beats</label>
+        </section>
+
+        <section class="mod">
+          <h3>Filters and finish</h3>
+          <label class="fader"><span>High-pass</span><input type="range" data-key="hp" data-log="20,8000" min="0" max="1000" /><output></output></label>
+          <label class="fader"><span>Low-pass</span><input type="range" data-key="lp" data-log="200,20000" min="0" max="1000" /><output></output></label>
+          <label class="fader"><span>Resonance</span><input type="range" data-key="res" min="0" max="24" step="0.5" /><output></output></label>
+          <label class="fader"><span>Drive</span><input type="range" data-key="drive" data-scale="0.01" min="0" max="100" /><output></output></label>
+          <label class="fader"><span>Lo-fi</span><input type="range" data-key="crush" data-scale="0.01" min="0" max="100" /><output></output></label>
+          <label class="fader"><span>Reverb</span><input type="range" data-key="reverb" data-scale="0.01" min="0" max="100" /><output></output></label>
+          <label class="fader"><span>Fade in</span><input type="range" data-key="fadeIn" min="0" max="500" step="5" /><output></output></label>
+          <label class="fader"><span>Fade out</span><input type="range" data-key="fadeOut" min="0" max="500" step="5" /><output></output></label>
+          <label class="fader"><span>Level</span><input type="range" data-key="gain" min="-18" max="12" step="0.5" /><output></output></label>
+          <label class="check"><input type="checkbox" data-key="normalize" /> Normalize loudness</label>
+          <button id="btnFxReset" class="btn small">Reset filters</button>
+        </section>
+      </div>
+
+      <section class="mod chop">
+        <h3>Chop</h3>
+        <div class="chop-ctl">
+          <label class="num"><span>Cut</span>
+            <select data-key="chopMode">
+              <option value="equal">Into equal slices</option>
+              <option value="transient">At the hits</option>
+              <option value="beat">On every beat</option>
+              <option value="manual">By hand</option>
+            </select>
+          </label>
+          <label class="fader"><span>Slices</span><input type="range" data-key="chopCount" min="2" max="64" step="1" /><output></output></label>
+          <span class="note">Click a pad or press its key to hear a slice. Drag a marker on the sample to move a cut.</span>
+        </div>
+        <div id="pads" class="pads"></div>
+        <div class="chop-ctl">
+          <strong class="sub">Flip order</strong>
+          <button id="btnShuffle" class="btn small">Shuffle</button>
+          <button id="btnRevOrder" class="btn small">Backwards</button>
+          <button id="btnResetOrder" class="btn small">Original order</button>
+          <span class="note">Drag the chips to rearrange, then play Flip.</span>
+        </div>
+        <div id="order" class="order"></div>
+      </section>
+
+      <section class="mod crate">
+        <h3>Crate</h3>
+        <div class="chop-ctl">
+          <label class="num grow"><span>Name</span><input id="crateName" type="text" spellcheck="false" /></label>
+          <label class="check"><input type="checkbox" id="crateStems" /> Include separate stems</label>
+          <button id="btnAdd" class="btn hot">Add to crate</button>
+        </div>
+        <ul id="crateList" class="crate-list"></ul>
+        <p id="crateEmpty" class="note">Nothing in the crate yet. When a sample sounds right, add it. Each one is saved with its slices, its flip and a settings sheet.</p>
+        <div class="chop-ctl">
+          <label class="num"><span>Quality</span>
+            <select id="bitDepth">
+              <option value="24">24-bit WAV</option>
+              <option value="16">16-bit WAV</option>
+            </select>
+          </label>
+          <button id="btnZip" class="btn" disabled>Export crate as ZIP</button>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
