@@ -2,13 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Flipside sample workshop</title>
     <meta name="description" content="Turn songs into samples: stems, pitch, loops, chops, beat match and ZIP export." />
     <meta name="theme-color" content="#11302c" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/png" href="icon-192.png" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Flipside" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -31,12 +35,16 @@
     <main id="empty" class="empty">
       <div id="drop" class="drop">
         <h2>Drop a song here</h2>
-        <p>WAV, MP3, FLAC, OGG or M4A. Everything is processed on this computer; nothing is uploaded.</p>
+        <p id="dropNote">WAV, MP3, FLAC, OGG or M4A. Everything is processed on this computer; nothing is uploaded.</p>
         <div class="row center">
           <button id="btnPick" class="btn hot">Choose a file</button>
           <button id="btnDemo" class="btn">Try the built-in demo groove</button>
         </div>
       </div>
+      <p id="iosHint" class="ios-hint" hidden>
+        <span>To keep Flipside on your home screen and use it offline: tap the Share button, then <strong>Add to Home Screen</strong>.</span>
+        <button id="iosHintClose" class="btn small">Got it</button>
+      </p>
     </main>
 
     <main id="bench" class="bench" hidden>
@@ -54,7 +62,7 @@
         <div class="lcd-head">
           <span id="regionRead"></span>
           <span class="grow"></span>
-          <span class="hint">Drag to select. Drag an edge to resize. Shift-drag starts a new selection. Scroll to zoom.</span>
+          <span id="waveHint" class="hint">Drag to select. Drag an edge to resize. Shift-drag starts a new selection. Scroll to zoom.</span>
         </div>
         <canvas id="smpWave" class="wave smp" aria-label="Your sample. Click a slice to hear it."></canvas>
         <div class="lcd-head">
@@ -175,7 +183,7 @@
             </select>
           </label>
           <label class="fader"><span>Slices</span><input type="range" data-key="chopCount" min="2" max="64" step="1" /><output></output></label>
-          <span class="note">Click a pad or press its key to hear a slice. Drag a marker on the sample to move a cut.</span>
+          <span id="padNote" class="note">Click a pad or press its key to hear a slice. Drag a marker on the sample to move a cut.</span>
         </div>
         <div id="pads" class="pads"></div>
         <div class="chop-ctl">
@@ -183,7 +191,7 @@
           <button id="btnShuffle" class="btn small">Shuffle</button>
           <button id="btnRevOrder" class="btn small">Backwards</button>
           <button id="btnResetOrder" class="btn small">Original order</button>
-          <span class="note">Drag the chips to rearrange, then play Flip.</span>
+          <span id="orderNote" class="note">Drag the chips to rearrange, then play Flip.</span>
         </div>
         <div id="order" class="order"></div>
       </section>

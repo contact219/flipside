@@ -43,6 +43,10 @@ export class SourceView {
   vs = 0;
   ve = 1;
   private drag: null | { kind: 'l' | 'r' | 'move' | 'new'; anchor: number; a0: number; b0: number } = null;
+  /** fingers on the canvas, by pointer id, as canvas x positions */
+  private pts = new Map<number, number>();
+  /** two-finger zoom and slide: the finger spacing, view width and time under the fingers when it began */
+  private pinch: null | { d0: number; span0: number; tMid: number } = null;
   private dirty = true;
 
   constructor(private c: HTMLCanvasElement) {
@@ -50,8 +54,8 @@ export class SourceView {
     new ResizeObserver(() => this.invalidate()).observe(c);
     c.addEventListener('pointerdown', (e) => this.down(e));
     c.addEventListener('pointermove', (e) => this.move(e));
-    c.addEventListener('pointerup', () => (this.drag = null));
-    c.addEventListener('pointercancel', () => (this.drag = null));
+    c.addEventListener('pointerup', (e) => this.up(e));
+    c.addEventListener('pointercancel', (e) => this.up(e));
     c.addEventListener('wheel', (e) => this.wheel(e), { passive: false });
     c.addEventListener('dblclick', () => this.zoomSel());
   }
@@ -111,13 +115,15 @@ export class SourceView {
     return ((e.clientX - r.left) / r.width) * this.c.width;
   }
 
-  private hit(x: number, shift: boolean): 'l' | 'r' | 'move' | 'new' {
-    const d = (window.devicePixelRatio || 1) * 7;
+  private hit(x: number, shift: boolean, touch = false): 'l' | 'r' | 'move' | 'new' {
+    // a fingertip needs a wider grab zone than a mouse pointer
+    const d = (window.devicePixelRatio || 1) * (touch ? 20 : 7);
     const xs = this.t2x(P.start);
     const xe = this.t2x(P.end);
     if (shift) return 'new';
-    if (Math.abs(x - xs) < d) return 'l';
-    if (Math.abs(x - xe) < d) return 'r';
+    const ds = Math.abs(x - xs);
+    const de = Math.abs(x - xe);
+    if (ds < d || de < d) return ds <= de ? 'l' : 'r';
     if (x > xs && x < xe) return 'move';
     return 'new';
   }
@@ -126,13 +132,37 @@ export class SourceView {
     if (!S.source) return;
     this.c.setPointerCapture(e.pointerId);
     const x = this.px(e);
-    const kind = this.hit(x, e.shiftKey);
+    this.pts.set(e.pointerId, x);
+    if (this.pts.size === 2) {
+      // a second finger means zoom, so undo whatever the first finger had started to do
+      if (this.drag) setRegion(this.drag.a0, this.drag.b0);
+      this.drag = null;
+      const [x1, x2] = [...this.pts.values()];
+      this.pinch = { d0: Math.max(1, Math.abs(x1 - x2)), span0: this.ve - this.vs, tMid: this.x2t((x1 + x2) / 2) };
+      return;
+    }
+    if (this.pts.size > 2) return;
+    const kind = this.hit(x, e.shiftKey, e.pointerType === 'touch');
     this.drag = { kind, anchor: this.x2t(x), a0: P.start, b0: P.end };
+  }
+
+  private up(e: PointerEvent) {
+    this.pts.delete(e.pointerId);
+    this.drag = null;
+    if (this.pts.size < 2) this.pinch = null;
   }
 
   private move(e: PointerEvent) {
     if (!S.source) return;
     const x = this.px(e);
+    if (this.pts.has(e.pointerId)) this.pts.set(e.pointerId, x);
+    if (this.pinch && this.pts.size >= 2) {
+      const [x1, x2] = [...this.pts.values()];
+      const span = (this.pinch.span0 * this.pinch.d0) / Math.max(1, Math.abs(x1 - x2));
+      const a = this.pinch.tMid - ((x1 + x2) / 2 / this.c.width) * span;
+      this.setView(a, a + span);
+      return;
+    }
     if (!this.drag) {
       const k = this.hit(x, e.shiftKey);
       this.c.style.cursor = k === 'l' || k === 'r' ? 'ew-resize' : k === 'move' ? 'grab' : 'crosshair';
@@ -267,6 +297,7 @@ export class SampleView {
     c.addEventListener('pointerdown', (e) => this.down(e));
     c.addEventListener('pointermove', (e) => this.move(e));
     c.addEventListener('pointerup', () => (this.dragMarker = -1));
+    c.addEventListener('pointercancel', () => (this.dragMarker = -1));
   }
   invalidate() {
     this.dirty = true;
@@ -279,17 +310,26 @@ export class SampleView {
     const r = this.c.getBoundingClientRect();
     return ((e.clientX - r.left) / r.width) * this.c.width;
   }
-  private markerAt(x: number): number {
-    const d = (window.devicePixelRatio || 1) * 6;
+  private markerAt(x: number, touch = false): number {
+    const w = this.c.width;
+    // wider grab zone for fingers, but never more than a third of a slice so the slices stay tappable
+    let d = (window.devicePixelRatio || 1) * (touch ? 16 : 6);
+    if (touch) d = Math.max((window.devicePixelRatio || 1) * 6, Math.min(d, w / S.slices.length / 3));
+    let best = -1;
+    let bestD = d;
     for (let i = 1; i < S.slices.length; i++) {
-      if (Math.abs((S.slices[i] / this.n()) * this.c.width - x) < d) return i;
+      const dist = Math.abs((S.slices[i] / this.n()) * w - x);
+      if (dist < bestD) {
+        bestD = dist;
+        best = i;
+      }
     }
-    return -1;
+    return best;
   }
   private down(e: PointerEvent) {
     if (!S.rendered) return;
     const x = this.px(e);
-    const m = this.markerAt(x);
+    const m = this.markerAt(x, e.pointerType === 'touch');
     if (m > 0) {
       this.dragMarker = m;
       this.c.setPointerCapture(e.pointerId);

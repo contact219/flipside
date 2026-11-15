@@ -45,6 +45,16 @@ const clock = (t: number) => {
 const hz = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)} kHz` : `${Math.round(v)} Hz`);
 const signed = (v: number, unit: string, digits = 0) => `${v > 0 ? '+' : ''}${v.toFixed(digits)} ${unit}`;
 
+/* ---------- what kind of device is this ---------- */
+const ua = navigator.userAgent;
+/** iPhone or iPad (an iPad says it is a Mac, but a Mac has no touch screen) */
+const isIOS = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+/** phone or tablet: no local AI stem server, no file drag and drop, no keyboard */
+const isMobile = isIOS || /Android/.test(ua);
+const isStandalone =
+  matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true;
+document.documentElement.classList.toggle('mobile', isMobile);
+
 const srcView = new SourceView($<HTMLCanvasElement>('srcWave'));
 const smpView = new SampleView($<HTMLCanvasElement>('smpWave'));
 
@@ -142,7 +152,7 @@ for (const el of ctls) {
     apply(key, readEl(el)),
   );
   if (el instanceof HTMLInputElement && el.type === 'range') {
-    el.title = 'Double-click to reset';
+    if (!isMobile) el.title = 'Double-click to reset';
     el.addEventListener('dblclick', () => apply(key, DEFAULTS[key]));
   }
 }
@@ -204,6 +214,9 @@ function defaultName(): string {
 /* ---------- stems ---------- */
 let ai: 'ready' | 'loading' | 'off' = 'off';
 async function checkAi() {
+  // The AI splitter is a program on a computer. A phone has none, and asking would only
+  // make the browser show a "look for devices on your network" prompt.
+  if (isMobile) return;
   const was = ai;
   ai = await aiStatus();
   if (ai !== was) buildStems();
@@ -213,7 +226,9 @@ function buildStems() {
   const rows = $('stemRows');
   const aiBtn = $<HTMLButtonElement>('btnSplitAi');
   const quickBtn = $<HTMLButtonElement>('btnSplit');
-  aiBtn.hidden = quickBtn.hidden = S.splitting;
+  quickBtn.hidden = S.splitting;
+  aiBtn.hidden = S.splitting || isMobile;
+  quickBtn.classList.toggle('hot', isMobile);
   aiBtn.disabled = ai !== 'ready';
   aiBtn.textContent = ai === 'loading' ? 'AI model loading…' : S.stems && S.stemKind === 'ai' ? 'Split with AI again' : 'Split with AI';
   quickBtn.textContent = S.stems && S.stemKind === 'quick' ? 'Quick split again' : 'Quick split';
@@ -229,8 +244,9 @@ function buildStems() {
     return;
   }
   if (!S.stems) {
-    note.textContent =
-      ai === 'off'
+    note.textContent = isMobile
+      ? 'Pull the song apart into drums, bass, vocals and everything else, then sample only the parts you want. A full song can take a minute or two on a phone. The cleaner AI split needs Flipside on a computer.'
+      : ai === 'off'
         ? 'Pull the song apart into drums, bass, vocals and everything else. The AI splitter is not running, so only the quick split is available. To switch it on, run ai_stems.bat (Windows) or ai_stems.command (Mac) from the Flipside folder.'
         : `Pull the song apart into drums, bass, vocals and everything else. AI gives clean stems and takes about ${mins} minute${mins > 1 ? 's' : ''} for this song. Quick is rougher and takes seconds.`;
     return;
@@ -282,37 +298,56 @@ function buildPads() {
     .map((_, i) => `<button class="pad" data-i="${i}">${i + 1}<small>${KEYS[i]?.toUpperCase() ?? ''}</small></button>`)
     .join('');
   $('order').innerHTML = S.order
-    .map((s, pos) => `<span class="chip ${s !== pos ? 'moved' : ''}" draggable="true" data-pos="${pos}">${s + 1}</span>`)
+    .map((s, pos) => `<span class="chip ${s !== pos ? 'moved' : ''}" data-pos="${pos}">${s + 1}</span>`)
     .join('');
 }
 $('pads').addEventListener('pointerdown', (e) => {
   const b = (e.target as HTMLElement).closest<HTMLElement>('.pad');
   if (b) playSlice(+b.dataset.i!);
 });
-let dragPos = -1;
+/* Rearranging the flip order: press a chip and slide it onto another. Done with pointer events
+   so it works the same with a mouse and with a finger. A press without a slide plays the slice. */
 const orderEl = $('order');
-orderEl.addEventListener('dragstart', (e) => {
-  dragPos = +((e.target as HTMLElement).dataset.pos ?? -1);
-  e.dataTransfer?.setData('text/plain', String(dragPos));
-});
-orderEl.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  orderEl.querySelectorAll('.over').forEach((c) => c.classList.remove('over'));
-  (e.target as HTMLElement).closest('.chip')?.classList.add('over');
-});
-orderEl.addEventListener('drop', (e) => {
-  e.preventDefault();
+let chipDrag: null | { id: number; pos: number; x: number; y: number; moved: boolean } = null;
+const chipAt = (x: number, y: number) =>
+  (document.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>('#order .chip') ?? null;
+const clearChipMarks = () => orderEl.querySelectorAll('.over, .lift').forEach((c) => c.classList.remove('over', 'lift'));
+orderEl.addEventListener('pointerdown', (e) => {
   const chip = (e.target as HTMLElement).closest<HTMLElement>('.chip');
-  if (!chip || dragPos < 0) return;
+  if (!chip || chipDrag) return;
+  chipDrag = { id: e.pointerId, pos: +chip.dataset.pos!, x: e.clientX, y: e.clientY, moved: false };
+  orderEl.setPointerCapture(e.pointerId);
+});
+orderEl.addEventListener('pointermove', (e) => {
+  const d = chipDrag;
+  if (!d || e.pointerId !== d.id) return;
+  if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 8) return;
+  d.moved = true;
+  clearChipMarks();
+  orderEl.children[d.pos]?.classList.add('lift');
+  const over = chipAt(e.clientX, e.clientY);
+  if (over && +over.dataset.pos! !== d.pos) over.classList.add('over');
+});
+orderEl.addEventListener('pointerup', (e) => {
+  const d = chipDrag;
+  if (!d || e.pointerId !== d.id) return;
+  chipDrag = null;
+  clearChipMarks();
+  if (!d.moved) {
+    playSlice(S.order[d.pos]);
+    return;
+  }
+  const chip = chipAt(e.clientX, e.clientY);
+  if (!chip) return;
   const to = +chip.dataset.pos!;
-  const [m] = S.order.splice(dragPos, 1);
+  if (to === d.pos) return;
+  const [m] = S.order.splice(d.pos, 1);
   S.order.splice(to, 0, m);
-  dragPos = -1;
   orderChanged();
 });
-orderEl.addEventListener('click', (e) => {
-  const chip = (e.target as HTMLElement).closest<HTMLElement>('.chip');
-  if (chip) playSlice(S.order[+chip.dataset.pos!]);
+orderEl.addEventListener('pointercancel', () => {
+  chipDrag = null;
+  clearChipMarks();
 });
 function orderChanged() {
   buildPads();
@@ -508,15 +543,31 @@ $('crateList').addEventListener('click', (e) => {
     refresh();
   }
 });
-$('btnZip').onclick = () => {
+$('btnZip').onclick = async () => {
   const bits = +$<HTMLSelectElement>('bitDepth').value as 16 | 24;
   const blob = exportZip(bits);
+  const count = `${crate.length} sample${crate.length > 1 ? 's' : ''}`;
+  // On a phone, hand the ZIP to the share sheet (Save to Files, AirDrop, another app) where the
+  // browser allows it. A plain download does not work in an installed iPhone app.
+  if (isMobile && navigator.canShare) {
+    const file = new File([blob], 'flipside_crate.zip', { type: 'application/zip' });
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'Flipside crate' });
+        status(`Shared ${count} as flipside_crate.zip.`);
+        return;
+      } catch (e) {
+        if ((e as DOMException).name === 'AbortError') return; // closed the share sheet
+        // anything else: fall through to a normal download
+      }
+    }
+  }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'flipside_crate.zip';
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-  status(`Exported ${crate.length} sample${crate.length > 1 ? 's' : ''} to flipside_crate.zip.`);
+  status(`Exported ${count} to flipside_crate.zip.`);
 };
 
 /* ---------- loading ---------- */
@@ -609,6 +660,46 @@ buildCrate();
 void checkAi();
 // the AI splitter may be started after the app is already open
 window.addEventListener('focus', () => void checkAi());
+
+/* ---------- phones and tablets ---------- */
+// Browsers keep sound off until the page has been touched, and an iPhone pauses it again
+// whenever the app goes to the background. Wake it on every touch; it costs nothing.
+const wake = () => {
+  if (ctx.state !== 'running') void ctx.resume().catch(() => undefined);
+};
+for (const ev of ['pointerup', 'touchend', 'click', 'keydown']) window.addEventListener(ev, wake, true);
+// Without this an iPhone plays nothing while its ring/silent switch is set to silent.
+try {
+  const session = (navigator as { audioSession?: { type: string } }).audioSession;
+  if (session) session.type = 'playback';
+} catch {
+  /* older browsers */
+}
+if (isMobile) {
+  $('drop').querySelector('h2')!.textContent = 'Open a song';
+  $('dropNote').textContent =
+    'WAV, MP3, FLAC, OGG or M4A, from your files. Everything is processed on this device; nothing is uploaded.';
+  $('waveHint').textContent = 'Drag to select. Drag an edge to resize. Pinch with two fingers to zoom and slide.';
+  $('padNote').textContent = 'Tap a pad to hear a slice. Drag a marker on the sample to move a cut.';
+  $('orderNote').textContent = 'Press a chip and slide it onto another to rearrange, then play Flip.';
+}
+// iPhones and iPads have no install button to offer, so explain the two taps it takes.
+const HINT_KEY = 'flipside-ios-hint';
+let hintSeen = false;
+try {
+  hintSeen = localStorage.getItem(HINT_KEY) === '1';
+} catch {
+  /* private browsing */
+}
+if (isIOS && !isStandalone && !hintSeen) $('iosHint').hidden = false;
+$('iosHintClose').onclick = () => {
+  $('iosHint').hidden = true;
+  try {
+    localStorage.setItem(HINT_KEY, '1');
+  } catch {
+    /* private browsing */
+  }
+};
 
 /* ---------- install as an app, work offline ---------- */
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
